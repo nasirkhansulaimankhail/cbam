@@ -7,8 +7,12 @@ from frappe.model.document import Document
 
 class SupplierEmployee(Document):
 	def before_validate(self):
+		self.set_confirmation_web_form_to_none()
 		self.check_confirmation_checkbox()
 		self.insert_supplier_company_if_from_web_form()
+
+	def validate(self):
+		self.validate_main_employee_in_supplier(False)
 
 	def before_save(self):
 		if self.is_data_confirmed == True:
@@ -22,8 +26,26 @@ class SupplierEmployee(Document):
 		self.rename()
 
 	def on_trash(self):
+		if not self.flags.is_bulk_delete:
+			self.validate_main_employee_in_supplier(True)
+		self.delete_all_cht_entries()
 		self.delete_child()
 		self.delete_link_in_good()
+
+
+	#validates the main employee for supplier
+	def validate_main_employee_in_supplier(self, flag):
+		if not frappe.db.exists("Supplier Employee", {
+			"name": ["!=", self.name], 
+			"supplier_company":self.supplier_company, 
+			"is_main_contact":1
+		}) and self.is_main_contact == flag:
+			frappe.throw("At least 1 main Employee must exist for Suppier {}".format(self.supplier_company))
+
+
+	def delete_all_cht_entries(self):
+		for good in self.goods:
+			good.delete()
 
 	def delete_child(self):
 		if self.supplier_company:
@@ -80,8 +102,13 @@ class SupplierEmployee(Document):
 			return False
 
 	def check_confirmation_checkbox(self):
-		if self.status == "Sent to Supplier Employee" and self.is_supplier_user() and self.is_data_confirmed != True:
-			frappe.throw("Please check the 'Data Confirmed' checkbox before submitting the form.")
+		if self.confirmation_web_form == "true" and self.is_supplier_user() and self.is_data_confirmed != True:
+			frappe.throw("Please check the 'Data Confirmed' checkbox before submitting the form or confirm first your personal data.")
+
+	def set_confirmation_web_form_to_none(self):
+		has_value_changed = self.has_value_changed("confirmation_web_form")
+		if not has_value_changed and self.confirmation_web_form:
+			self.confirmation_web_form = None
 
 	def insert_supplier_company_if_from_web_form(self):
 		if self.is_supplier_user() and not self.supplier_company:

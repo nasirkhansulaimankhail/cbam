@@ -4,7 +4,7 @@
 import frappe
 from frappe.model.document import Document
 import uuid
-
+from frappe.utils import cstr
 
 class CBAMOperatingCompany(Document):
 	def before_naming(self):
@@ -14,10 +14,27 @@ class CBAMOperatingCompany(Document):
 		self.add_user_as_contact_person()
 		self.set_full_name()
 		self.set_parent_supplier()
+		self._create_new_employee()
+
+
+	def _create_new_employee(self):
+
+		if not self.contact_person_employee:
+			contact_person = frappe.db.get_value("Supplier Employee", {"email": self.email}, "name")
+			if not contact_person:
+				contact_person_doc = frappe.new_doc("Supplier Employee")
+				contact_person_doc.supplier_company = self.parent_supplier
+				contact_person_doc.first_name = self.first_name
+				contact_person_doc.last_name = self.last_name
+				contact_person_doc.phone_number = self.phone_number
+				contact_person_doc.email = self.email
+				contact_person_doc.position = self.position_in_the_company
+				contact_person_doc.save()
+				contact_person = contact_person_doc.name
+			self.contact_person_employee = contact_person
 
 	def generated_uuid(self):
-		generated_uuid = uuid.uuid4()
-		self.uuid = generated_uuid
+		self.uuid = cstr(uuid.uuid4())
 
 	def check_if_user_supplieruser(self):
 		user_email = frappe.session.user

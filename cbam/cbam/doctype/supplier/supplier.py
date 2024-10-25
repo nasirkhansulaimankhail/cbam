@@ -5,22 +5,32 @@
 
 import frappe
 from frappe.model.document import Document
-
-
+from frappe.utils import cstr
+from frappe import _
 class Supplier(Document):
 	def before_insert(self):
+		
 		self.sub_supplier()
 		self.add_doc_name_as_supplier_number()
 
 	def before_validate(self):
+		#self._create_new_employee()
+		self.set_confirmation_web_form_to_none()
 		self.check_confirmation_checkbox()
 
 	def before_save(self):
+		#self._create_new_employee()
 		if self.is_data_confirmed == True:
 			self.status = "Confirmed"
 
 	def on_update(self):
 		self.create_new_employee()
+
+
+#	def validate(self):
+#		pass
+	
+
 
 	# def after_insert(self):
 	# 	self.add_main_employee_to_cht()
@@ -106,7 +116,6 @@ class Supplier(Document):
 		if not self.supplier_number:
 			self.supplier_number = self.name
 
-
 	def check_confirmation_checkbox(self):
 		user_email = frappe.session.user
 		try:
@@ -116,3 +125,26 @@ class Supplier(Document):
 		role_list = [r.role for r in user.roles]
 		if "Supplier" in role_list and self.confirmation_web_form == "true" and self.is_data_confirmed != True:
 			frappe.throw("Please check the 'Data Confirmed' checkbox before submitting the form.")
+
+	def set_confirmation_web_form_to_none(self):
+		has_value_changed = self.has_value_changed("confirmation_web_form")
+		if not has_value_changed and self.confirmation_web_form:
+			self.confirmation_web_form = None
+
+	
+	@frappe.whitelist()
+	def delete_linked_employees(self):
+		success = True
+		employees = frappe.get_all("Supplier Employee", filters={"supplier_company": self.name}, fields=["name"])
+		if not employees:
+			return _("No Associated Employee found.")
+		try:
+			for employee in employees:
+				doc = frappe.get_doc("Supplier Employee", employee.name)
+				doc.flags.is_bulk_delete = True
+				doc.delete()
+		except Exception as e:
+			success = False
+			frappe.throw(cstr(e))
+		if success:
+			return _("Deleted all employees successfully.")
