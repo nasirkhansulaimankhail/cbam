@@ -13,16 +13,42 @@ class Good(Document):
 
 	def before_save(self):
 		self.delete_old_employee_if_supplier_changed()
-		
-		if self.is_data_confirmed == True and self.manufacture == "I am the manufacture":
+		self.get_main_contact_employee()
+		if self.is_data_confirmed == True and self.manufacture == "I am able to provide the emission data of this product":
 			self.status = "Done"
 		self.add_to_supplier_cht()
 		self.add_to_employee_cht()
+		self.add_to_customs_import_cht()
 
 	def validate(self):
-		if self.manufacture == "I am NOT the manufacturer of the whole amount of the product" and not self.good_splitted:
+		if self.manufacture == "The mass of this product needs to be split into several parts, due to shared responsibilities. I will assign the responsible parties" and not self.good_splitted:
 			self.split_good()
+		elif self.manufacture == "I am not able to provide emission data and will delegate this request":
+			self.forward_goods()
+		elif self.manufacture == "This item was not purchased from us. I want to reject this request back to the sender.":
+			self.reject_goods()
 
+	def reject_goods(self):
+		self.status = "Rejected"
+		#send email alert to the owner of good
+		self.send_email("Rejected")
+
+
+	def forward_goods(self):
+		
+		self.forwarded_from_employee = self.employee
+		if self.forward_to == "Another Supplier":
+			self.forwarded_from_supplier = self.supplier
+			self.supplier = self.forward_to_supplier
+			self.set_main_contact()
+			self.send_email("Another supplier is responsible")
+		else:
+			self.employee = self.forward_to_employee
+			self.send_email("Another employee is responsible")
+		self.forward_to_supplier = ""
+		self.forward_to_employee = ""
+		self.manufacture = "I am able to provide the emission data of this product"
+		self.is_data_confirmed = False
 	def on_trash(self):
 		self.delete_all_good_item()
 
@@ -34,11 +60,15 @@ class Good(Document):
 
 	def get_main_contact_employee(self):
 		if self.supplier and not self.employee:
-			supplier_doc = frappe.get_doc("Supplier", self.supplier)
-			for child in supplier_doc.employees:
-				if child.is_main_contact in ["1", 1, True]:
-					main_contact = child.employee_number
-					self.employee = main_contact
+			self.set_main_contact()
+
+
+	def set_main_contact(self):
+		supplier_doc = frappe.get_doc("Supplier", self.supplier)
+		for child in supplier_doc.employees:
+			if child.is_main_contact in ["1", 1, True]:
+				main_contact = child.employee_number
+				self.employee = main_contact
 
 	def handle_total_raw_mass(self):
 		total_raw_mass = sum(
@@ -57,7 +87,7 @@ class Good(Document):
 			frappe.throw(f"The raw mass total of the components is not equal to the raw mass of the original good. <br><br> The total should be {original_raw_mass}, not {total_raw_mass}. <br><br> Please change the raw masses of the components and ensure that they add up to a total of {original_raw_mass}.")
 
 	def split_good(self):
-		self.handle_total_raw_mass()		
+		self.handle_total_raw_mass()
 		for i in range(5):
 			good_no = i+1
 			if getattr(self, f"split_raw_mass_{good_no}") > 0:
@@ -177,11 +207,12 @@ class Good(Document):
 			self.confirmation_web_form = None
 
 	def send_email(self, responsiblity=None, employee=None):
-		if responsiblity:
+		if responsiblity and responsiblity != "I'm the responsible Person":
+			template = ""
 			employee_email = frappe.db.get_value("Supplier Employee", self.employee, "email")
 			user_exists = frappe.db.exists("User", employee_email)
 			settings = frappe.get_single("CBAM Settings")
-		
+
 			if responsiblity == "Another employee is responsible":
 				template = settings.tier_1_registered_employee_template
 				if not user_exists:
@@ -193,6 +224,11 @@ class Good(Document):
 				if not user_exists:
 					create_new_supplier_user(self.employee)
 					template = settings.tier_n1_unregistered_template
+			elif responsiblity == "Rejected":
+				template = settings.supplier_good_rejection_notification_template
+			else:
+				frappe.msgprint("Test else")
+				template = settings.tier_n1_registered_template #! Just for testing reason
 
 			notification = frappe.get_doc("Notification", template)
 			notification.send(self)
