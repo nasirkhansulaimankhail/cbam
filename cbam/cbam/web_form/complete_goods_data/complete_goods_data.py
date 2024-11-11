@@ -35,7 +35,7 @@ def get_suppliers_owned_by_supplier_employees(supplier):
 		suppliers = frappe.get_all("Supplier", filters={"owner": e}, fields=["name"], pluck="name")
 		supplier_options_list.extend(suppliers)
 	# frappe.msgprint(f"Supplier Option List: {supplier_options_list}")
-	supplier_options = [{"label": d, "value": d} for d in supplier_options_list]
+	supplier_options = [{"label": d, "value": d} for d in supplier_options_list if d != supplier]
 	# frappe.msgprint(f"Supplier Options: {supplier_options}")
 	return {
 		"supplier_options": supplier_options,
