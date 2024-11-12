@@ -15,9 +15,9 @@
         <table class="goods-table">
             <thead>
                 <tr>
-                    <th>Invoice Nr.</th>
                     <th>Article Nr.</th>
                     <th>Good Description</th>
+                    <th>Raw Mass</th>
                     <th>Edit</th>
                 </tr>
             </thead>
@@ -25,9 +25,9 @@
                 <!-- Loop through the goods_list data and display each row -->
                 {% for good in goods_list %}
                 <tr>
-                    <td>{{ good.invoice_number }}</td>
                     <td>{{ good.article_number }}</td>
                     <td>{{ good.good_description }}</td>
+                    <td>{{ good.raw_mass }}</td>
                     {% if good.status == "Raw Data" or good.status == "Sent for completing" %}
                     <td><a href="/complete-goods-data/{{ good.name }}/edit"><button>Edit</button></a></td>
                     {% elif good.status == "Rejected" %}
