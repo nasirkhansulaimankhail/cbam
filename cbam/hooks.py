@@ -4,7 +4,7 @@ app_publisher = "phamos GmbH"
 app_description = "Handling The EU\'s Carbon Border Adjustment Mechanism (CBABAM))"
 app_email = "wolfram.schmidt@phamos.eu"
 app_license = "mit"
-
+app_logo_url = "/assets/cbam/images/gallehr_partner_logo.png"
 
 
 
@@ -280,6 +280,7 @@ fixtures = [
      {"dt": "Notification", "filters": [
         [
             "name", "in", [
+                "Tier 1 Request Email",
                 "Tier n+1 Unregistered Supplier Template",
                 "Tier n+1 Registered Supplier Template",
                 "Tier 1 Unregistered Employee Template",
@@ -287,6 +288,5 @@ fixtures = [
                 "Supplier Good Rejection Notification Template"
             ]
         ]
-    ]
-    },
+    ]},
 ]
